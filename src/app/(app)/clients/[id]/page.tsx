@@ -22,6 +22,7 @@ interface OpenTask {
 
 const TAX_TYPE_LABEL: Record<string, string> = {
   hst: "HST",
+  hst_instalment: "HST Instalments",
   wsib: "WSIB",
   eht: "EHT",
   payroll_remittance: "Payroll remittance",

@@ -56,6 +56,7 @@ export interface Client {
 
 export type TaxType =
   | "hst"
+  | "hst_instalment"
   | "wsib"
   | "eht"
   | "payroll_remittance"
