@@ -1,16 +1,35 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { signOut } from "@/app/login/actions";
 import { getStaffAccess, accessibleModules } from "@/lib/access";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const access = await getStaffAccess();
 
-  // Covers both "not signed in" (proxy should already have redirected —
-  // this is defense in depth) and "signed in but no staff row provisioned
-  // yet" — either way there's nothing to show.
+  // Deliberately renders here rather than redirecting to /login: the
+  // proxy already sends genuinely signed-out visitors to /login, and if
+  // this also redirected there for "signed in but no staff row yet", a
+  // signed-in user with no staff record would bounce between the two
+  // forever (login sees a session and sends them back to "/", this layout
+  // sees no staff row and sends them back to login). Showing a page
+  // breaks that loop.
   if (!access.staff) {
-    redirect("/login");
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+        <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-6 text-center">
+          <h1 className="text-lg font-semibold text-slate-900">Account not set up yet</h1>
+          <p className="mt-2 text-sm text-slate-500">
+            You&apos;re signed in, but there&apos;s no staff record linked to
+            this account yet. Ask an admin to add you, or run the staff seed
+            script if you&apos;re setting this up.
+          </p>
+          <form action={signOut} className="mt-4">
+            <button type="submit" className="text-sm text-slate-500 underline hover:text-slate-900">
+              Sign out
+            </button>
+          </form>
+        </div>
+      </div>
+    );
   }
 
   const modules = accessibleModules(access);
