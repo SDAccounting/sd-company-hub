@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/*
+ * Deliberately no dark-mode media query yet: page content below uses
+ * fixed light-mode Tailwind classes (bg-white, text-slate-900, etc.), so
+ * auto-switching just the body background to dark here made text
+ * unreadable against the light card content. Revisit properly (with
+ * dark: variants throughout) rather than re-adding this in isolation.
+ */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
