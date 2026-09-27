@@ -148,3 +148,23 @@ export interface CloseChecklistTemplateItem {
   title: string;
   sort_order: number;
 }
+
+export interface TimesheetCategory {
+  id: string;
+  name: string;
+  active: boolean;
+  created_at: string;
+}
+
+export interface TimeEntry {
+  id: string;
+  staff_id: string;
+  client_id: string | null;
+  category_id: string | null;
+  entry_date: string;
+  hours: number;
+  note: string | null;
+  is_sample: boolean;
+  created_at: string;
+  updated_at: string;
+}

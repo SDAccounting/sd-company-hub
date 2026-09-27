@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Client, ClientFinancialAccount, ClientTaxAccount } from "@/lib/types";
 import { Card, Field, EmptyState } from "./card";
 import { Tabs } from "./tabs";
-import { ClientTimesheetMockup } from "./timesheet-mockup";
+import { ClientTimesheet } from "./client-timesheet";
 import {
   addTaxAccount,
   deleteTaxAccount,
@@ -272,7 +272,7 @@ export default async function ClientDetailPage({
     </Card>
   );
 
-  const timesheetTab = <ClientTimesheetMockup clientName={client.display_name} />;
+  const timesheetTab = <ClientTimesheet clientId={client.id} clientName={client.display_name} />;
 
   const tasksTab = (
     <Card title="Open Tasks">

@@ -53,8 +53,14 @@ top of this foundation as its own module.
 7. `npm install && npm run dev`, then sign in at `/login`.
 
 Going forward, new schema changes land as a new numbered file in
-`supabase/migrations/` (e.g. `0008_...sql`) — paste just that one file into
+`supabase/migrations/` (e.g. `0009_...sql`) — paste just that one file into
 the SQL Editor when it shows up, no need to re-run the combined script.
+
+`supabase/sample_timesheet_data.sql` seeds a few weeks of realistic-looking
+time entries (flagged `is_sample = true`) so the Timesheet report has
+something to show. Delete them any time with
+`delete from time_entries where is_sample = true;`, or the "Clear N sample
+entries" button on the report page itself.
 
 ## Project structure
 
