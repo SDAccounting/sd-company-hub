@@ -3,6 +3,7 @@ import type { StaffRole } from "./types";
 export type ModuleKey =
   | "clients"
   | "close_tracker"
+  | "timesheet"
   | "tax_remittance"
   | "task_tracker"
   | "capacity_dashboard"
@@ -36,6 +37,7 @@ export interface ModuleDef {
 export const MODULES: ModuleDef[] = [
   { key: "clients", label: "Clients", href: "/clients", live: true, access: "open" },
   { key: "close_tracker", label: "Close Tracker", href: "/close-tracker", live: true, access: "open" },
+  { key: "timesheet", label: "Timesheet", href: "/timesheet", live: true, access: "open" },
   { key: "tax_remittance", label: "Tax remittance tracker", href: "/tax-remittance", live: false, access: "open" },
   { key: "task_tracker", label: "Task tracker", href: "/tasks", live: false, access: "open" },
   { key: "capacity_dashboard", label: "Capacity dashboard", href: "/capacity", live: false, access: "adminOnly" },
