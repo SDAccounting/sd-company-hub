@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 const SETTINGS_LINKS = [
+  { href: "/settings/staff", label: "Staff" },
   { href: "/settings/access", label: "Access" },
   { href: "/settings/categories", label: "Timesheet categories" },
 ];
