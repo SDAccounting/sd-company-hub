@@ -47,18 +47,41 @@ export async function GET(request: Request) {
 
   const { data: entries } = await query.returns<EntryRow[]>();
 
-  const csv = toCsv(
-    ["Date", "Staff", "Client", "Category", "Hours", "Note", "Sample"],
-    (entries ?? []).map((e) => [
-      e.entry_date,
-      e.staff?.full_name ?? "Unknown",
-      e.clients?.display_name ?? "Internal / Admin",
-      e.timesheet_categories?.name ?? "",
-      e.hours,
-      e.note ?? "",
-      e.is_sample ? "yes" : "",
-    ]),
-  );
+  // Grouped alphabetically by client, with a subtotal row after each
+  // client's entries and a grand total at the end -- matches the shape of
+  // the monthly invoicing report Brad already pulls for billing.
+  const byClient = new Map<string, EntryRow[]>();
+  for (const e of entries ?? []) {
+    const clientName = e.clients?.display_name ?? "Internal / Admin";
+    const group = byClient.get(clientName) ?? [];
+    group.push(e);
+    byClient.set(clientName, group);
+  }
+  const clientNames = [...byClient.keys()].sort((a, b) => a.localeCompare(b));
+
+  const rows: unknown[][] = [];
+  let grandTotal = 0;
+  for (const clientName of clientNames) {
+    const group = byClient.get(clientName)!;
+    let clientTotal = 0;
+    for (const e of group) {
+      clientTotal += Number(e.hours);
+      rows.push([
+        e.entry_date,
+        e.staff?.full_name ?? "Unknown",
+        clientName,
+        e.timesheet_categories?.name ?? "",
+        e.hours,
+        e.note ?? "",
+        e.is_sample ? "yes" : "",
+      ]);
+    }
+    rows.push(["", "", `${clientName} total`, "", clientTotal.toFixed(2), "", ""]);
+    grandTotal += clientTotal;
+  }
+  rows.push(["", "", "Grand total", "", grandTotal.toFixed(2), "", ""]);
+
+  const csv = toCsv(["Date", "Staff", "Client", "Category", "Hours", "Note", "Sample"], rows);
 
   return new Response(csv, {
     headers: {
