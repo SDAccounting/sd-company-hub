@@ -88,6 +88,14 @@ export default async function TimesheetReportPage({
   const clientRows = [...byClient.entries()].sort((a, b) => b[1] - a[1]);
   const grandTotal = clientRows.reduce((sum, [, h]) => sum + h, 0);
 
+  const exportQuery = new URLSearchParams({
+    from,
+    to,
+    ...(params.clientId ? { clientId: params.clientId } : {}),
+    ...(params.staffId ? { staffId: params.staffId } : {}),
+    ...(params.categoryId ? { categoryId: params.categoryId } : {}),
+  }).toString();
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -99,6 +107,12 @@ export default async function TimesheetReportPage({
         </div>
         <div className="flex items-center gap-3">
           <ClearSampleButton sampleCount={sampleCount} />
+          <a
+            href={`/timesheet/report/export?${exportQuery}`}
+            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Export CSV
+          </a>
           <Link href="/timesheet" className="text-sm text-slate-500 hover:text-slate-700">
             ← Back to timesheet
           </Link>
