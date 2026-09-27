@@ -1,8 +1,9 @@
 // VISION MOCKUP ONLY — client-side state only, nothing persists yet.
-// v3: quick-add bar above the grid (appends a new client row), and notes
-// collapsed out of the grid into a per-row expandable panel (dated, so
-// you can look back at where a client got hung up) instead of a
-// permanently-visible notes column.
+// v4: adds a searchable Client field and a searchable Category field
+// (Double calls this concept "workstreams" — same idea, admin-managed
+// list). Client/category search here uses a native <datalist> as a
+// stand-in for "search or dropdown" — fine for a mockup; the real build
+// can use a nicer combobox once there's real data behind it.
 
 "use client";
 
@@ -18,6 +19,17 @@ const DAYS = [
   { label: "Sun", date: "28" },
 ];
 
+// Stand-ins for the real clients table and the admin-managed category
+// list (see the Categories settings mockup at /settings/categories).
+const MOCK_CLIENTS = ["Test Client One", "Test Client Two", "CDI Demolition Inc.", "Internal / Admin"];
+const MOCK_CATEGORIES = [
+  "Month-end reconciliation",
+  "Year-end tax remittance",
+  "Bookkeeping catch-up",
+  "Ad-hoc / client request",
+  "Onboarding",
+];
+
 interface DayNote {
   day: string; // "Mon 22"
   note: string;
@@ -26,6 +38,7 @@ interface DayNote {
 interface MockRow {
   id: string;
   client: string;
+  category: string;
   hours: (number | null)[]; // one per day, Mon..Sun
   notes: DayNote[];
 }
@@ -34,6 +47,7 @@ const INITIAL_ROWS: MockRow[] = [
   {
     id: "1",
     client: "Test Client One",
+    category: "Month-end reconciliation",
     hours: [4, 2.5, null, 3, null, null, null],
     notes: [
       { day: "Mon 22", note: "Reconciled bank + credit card, all clean." },
@@ -44,18 +58,21 @@ const INITIAL_ROWS: MockRow[] = [
   {
     id: "2",
     client: "CDI Demolition Inc.",
+    category: "Month-end reconciliation",
     hours: [3, null, 6, null, null, null, null],
     notes: [{ day: "Wed 24", note: "Month-end close complete, sent financials." }],
   },
   {
     id: "3",
     client: "Test Client Two",
+    category: "Year-end tax remittance",
     hours: [null, 5, null, null, 4, null, null],
     notes: [],
   },
   {
     id: "4",
     client: "Internal / Admin",
+    category: "Ad-hoc / client request",
     hours: [1, null, null, 0.5, null, null, null],
     notes: [],
   },
@@ -69,6 +86,7 @@ export default function TimesheetMockupPage() {
   const [rows, setRows] = useState(INITIAL_ROWS);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [quickClient, setQuickClient] = useState("");
+  const [quickCategory, setQuickCategory] = useState("");
   const [quickNote, setQuickNote] = useState("");
 
   function addRow() {
@@ -78,11 +96,13 @@ export default function TimesheetMockupPage() {
       {
         id: crypto.randomUUID(),
         client: quickClient.trim(),
+        category: quickCategory.trim(),
         hours: [null, null, null, null, null, null, null],
         notes: quickNote.trim() ? [{ day: "Mon 22", note: quickNote.trim() }] : [],
       },
     ]);
     setQuickClient("");
+    setQuickCategory("");
     setQuickNote("");
   }
 
@@ -97,7 +117,7 @@ export default function TimesheetMockupPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-slate-900">My Timesheet</h1>
-          <p className="mt-1 text-sm text-slate-500">Layout mockup, v3 — quick-add + collapsible notes.</p>
+          <p className="mt-1 text-sm text-slate-500">Layout mockup, v4 — client + category search.</p>
         </div>
         <div className="flex items-center gap-3">
           <button className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-600 hover:bg-slate-50">
@@ -114,11 +134,31 @@ export default function TimesheetMockupPage() {
         <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Add a client to this week</h2>
         <div className="mt-2 flex flex-col gap-2 sm:flex-row">
           <input
+            list="mock-clients"
             value={quickClient}
             onChange={(e) => setQuickClient(e.target.value)}
-            placeholder="Client name…"
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:w-64"
+            placeholder="Search or pick a client…"
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:w-56"
           />
+          <datalist id="mock-clients">
+            {MOCK_CLIENTS.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
+
+          <input
+            list="mock-categories"
+            value={quickCategory}
+            onChange={(e) => setQuickCategory(e.target.value)}
+            placeholder="Category…"
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:w-52"
+          />
+          <datalist id="mock-categories">
+            {MOCK_CATEGORIES.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
+
           <textarea
             value={quickNote}
             onChange={(e) => setQuickNote(e.target.value)}
@@ -140,6 +180,7 @@ export default function TimesheetMockupPage() {
           <thead>
             <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
               <th className="px-4 py-3 font-medium">Client</th>
+              <th className="px-2 py-3 font-medium">Category</th>
               {DAYS.map((d) => (
                 <th key={d.label} className="px-2 py-3 text-center font-medium">
                   {d.label}
@@ -155,6 +196,14 @@ export default function TimesheetMockupPage() {
               <Fragment key={row.id}>
                 <tr className="border-b border-slate-100 last:border-0">
                   <td className="px-4 py-2 font-medium text-slate-900">{row.client}</td>
+                  <td className="px-2 py-2">
+                    <input
+                      list="mock-categories"
+                      defaultValue={row.category}
+                      placeholder="Category…"
+                      className="w-40 rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600"
+                    />
+                  </td>
                   {row.hours.map((h, i) => (
                     <td key={i} className="px-1 py-2">
                       <input
@@ -183,7 +232,7 @@ export default function TimesheetMockupPage() {
                 </tr>
                 {expandedId === row.id && (
                   <tr className="bg-slate-50">
-                    <td colSpan={DAYS.length + 2} className="px-6 py-3">
+                    <td colSpan={DAYS.length + 3} className="px-6 py-3">
                       {row.notes.length > 0 ? (
                         <ul className="space-y-1.5 text-sm">
                           {row.notes.map((n, i) => (
@@ -209,7 +258,9 @@ export default function TimesheetMockupPage() {
           </tbody>
           <tfoot>
             <tr className="border-t border-slate-200 bg-slate-50 text-sm font-semibold text-slate-900">
-              <td className="px-4 py-2">Daily total</td>
+              <td colSpan={2} className="px-4 py-2">
+                Daily total
+              </td>
               {DAYS.map((_, i) => (
                 <td key={i} className="px-1 py-2 text-center">
                   {dayTotal(i) || "—"}
