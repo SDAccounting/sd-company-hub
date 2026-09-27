@@ -24,6 +24,8 @@ const INITIAL_CATEGORIES: Category[] = [
 export default function CategoriesSettingsPage() {
   const [categories, setCategories] = useState(INITIAL_CATEGORIES);
   const [newName, setNewName] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
 
   function addCategory() {
     if (!newName.trim()) return;
@@ -33,6 +35,28 @@ export default function CategoriesSettingsPage() {
 
   function toggleActive(id: string) {
     setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, active: !c.active } : c)));
+  }
+
+  function startEdit(c: Category) {
+    setEditingId(c.id);
+    setEditingName(c.name);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditingName("");
+  }
+
+  function saveEdit(id: string) {
+    if (!editingName.trim()) return;
+    setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, name: editingName.trim() } : c)));
+    cancelEdit();
+  }
+
+  function deleteCategory(id: string) {
+    if (!confirm("Delete this category? Old entries keep it, but nobody can pick it going forward.")) return;
+    setCategories((prev) => prev.filter((c) => c.id !== id));
+    if (editingId === id) cancelEdit();
   }
 
   return (
@@ -48,19 +72,57 @@ export default function CategoriesSettingsPage() {
 
       <div className="mt-6 rounded-lg border border-slate-200 bg-white">
         <ul className="divide-y divide-slate-100">
-          {categories.map((c) => (
-            <li key={c.id} className="flex items-center justify-between px-4 py-3">
-              <span className={`text-sm ${c.active ? "text-slate-900" : "text-slate-400 line-through"}`}>
-                {c.name}
-              </span>
-              <button
-                onClick={() => toggleActive(c.id)}
-                className="text-xs text-slate-400 hover:text-slate-700"
-              >
-                {c.active ? "Deactivate" : "Reactivate"}
-              </button>
-            </li>
-          ))}
+          {categories.map((c) =>
+            editingId === c.id ? (
+              <li key={c.id} className="flex items-center gap-2 px-4 py-3">
+                <input
+                  autoFocus
+                  value={editingName}
+                  onChange={(e) => setEditingName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveEdit(c.id);
+                    if (e.key === "Escape") cancelEdit();
+                  }}
+                  className="flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+                />
+                <button
+                  onClick={() => saveEdit(c.id)}
+                  className="text-xs font-medium text-slate-900 hover:underline"
+                >
+                  Save
+                </button>
+                <button onClick={cancelEdit} className="text-xs text-slate-400 hover:text-slate-700">
+                  Cancel
+                </button>
+              </li>
+            ) : (
+              <li key={c.id} className="flex items-center justify-between px-4 py-3">
+                <span className={`text-sm ${c.active ? "text-slate-900" : "text-slate-400 line-through"}`}>
+                  {c.name}
+                </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => startEdit(c)}
+                    className="text-xs text-slate-400 hover:text-slate-700"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => toggleActive(c.id)}
+                    className="text-xs text-slate-400 hover:text-slate-700"
+                  >
+                    {c.active ? "Deactivate" : "Reactivate"}
+                  </button>
+                  <button
+                    onClick={() => deleteCategory(c.id)}
+                    className="text-xs text-red-400 hover:text-red-600"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </li>
+            ),
+          )}
         </ul>
         <div className="flex items-center gap-2 border-t border-slate-100 px-4 py-3">
           <input
