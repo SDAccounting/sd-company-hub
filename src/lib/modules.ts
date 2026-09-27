@@ -45,7 +45,7 @@ export const MODULES: ModuleDef[] = [
   { key: "stat_holiday_calculator", label: "Stat holiday calculator", href: "/stat-holiday", live: false, access: "open" },
   { key: "cleanup_ops", label: "Cleanup Ops", href: "/cleanup-ops", live: false, access: "grantable" },
   { key: "onboarding", label: "Onboarding", href: "/onboarding", live: false, access: "open" },
-  { key: "settings_access", label: "Access settings", href: "/settings/access", live: true, access: "adminOnly" },
+  { key: "settings_access", label: "Settings", href: "/settings/access", live: true, access: "adminOnly" },
 ];
 
 /** Modules an admin can grant to specific staff, shown in /settings/access. */

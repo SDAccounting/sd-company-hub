@@ -4,6 +4,7 @@ import { getStaffAccess } from "@/lib/access";
 import { GRANTABLE_MODULES } from "@/lib/modules";
 import type { ModuleAccessGrant, Staff } from "@/lib/types";
 import { AccessToggle } from "./access-toggle";
+import { SettingsNav } from "../settings-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,7 @@ export default async function AccessSettingsPage() {
 
   return (
     <div>
+      <SettingsNav active="/settings/access" />
       <h1 className="text-lg font-semibold text-slate-900">Access settings</h1>
       <p className="mt-1 text-sm text-slate-500">
         Admins always have access to everything. Capacity Dashboard is

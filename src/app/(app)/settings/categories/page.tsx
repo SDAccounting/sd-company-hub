@@ -5,6 +5,7 @@
 "use client";
 
 import { useState } from "react";
+import { SettingsNav } from "../settings-nav";
 
 interface Category {
   id: string;
@@ -36,6 +37,7 @@ export default function CategoriesSettingsPage() {
 
   return (
     <div>
+      <SettingsNav active="/settings/categories" />
       <h1 className="text-lg font-semibold text-slate-900">Timesheet categories</h1>
       <p className="mt-1 text-sm text-slate-500">
         Manage the category list staff pick from when logging time (e.g.
