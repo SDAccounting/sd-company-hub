@@ -41,8 +41,17 @@ export default async function TimesheetPage({
     .gte("entry_date", days[0].date)
     .lte("entry_date", days[6].date);
 
+  const { data: locks } = await supabase
+    .from("timesheet_locks")
+    .select("period_start, period_end")
+    .lte("period_start", days[6].date)
+    .gte("period_end", days[0].date)
+    .returns<{ period_start: string; period_end: string }[]>();
+
   return (
     <TimesheetGrid
+      key={monday}
+      locks={(locks ?? []).map((l) => ({ start: l.period_start, end: l.period_end }))}
       monday={monday}
       prevWeekHref={`/timesheet?week=${addWeeks(monday, -1)}`}
       nextWeekHref={`/timesheet?week=${addWeeks(monday, 1)}`}

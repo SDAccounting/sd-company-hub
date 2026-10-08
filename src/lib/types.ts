@@ -156,6 +156,15 @@ export interface TimesheetCategory {
   created_at: string;
 }
 
+export interface TimesheetLock {
+  id: string;
+  period_start: string;
+  period_end: string;
+  note: string | null;
+  locked_by: string | null;
+  locked_at: string;
+}
+
 export interface TimeEntry {
   id: string;
   staff_id: string;

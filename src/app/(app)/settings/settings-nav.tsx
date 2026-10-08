@@ -4,6 +4,7 @@ const SETTINGS_LINKS = [
   { href: "/settings/staff", label: "Staff" },
   { href: "/settings/access", label: "Access" },
   { href: "/settings/categories", label: "Timesheet categories" },
+  { href: "/settings/timesheet-locks", label: "Timesheet locks" },
 ];
 
 export function SettingsNav({ active }: { active: string }) {

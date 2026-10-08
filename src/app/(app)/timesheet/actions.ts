@@ -23,7 +23,7 @@ export async function logTime(input: {
   entryDate: string;
   hours?: number;
   note?: string | null;
-}) {
+}): Promise<{ error?: string }> {
   const access = await getStaffAccess();
   if (!access.staff) throw new Error("Not signed in");
   const supabase = await createClient();
@@ -35,29 +35,37 @@ export async function logTime(input: {
   ).maybeSingle();
   const existing = existingResult.data as { id: string } | null;
 
+  let error: { message: string } | null = null;
   if (existing) {
     const patch: Record<string, unknown> = {};
     if (input.hours !== undefined) patch.hours = input.hours;
     if (input.note !== undefined) patch.note = input.note;
     if (Object.keys(patch).length > 0) {
-      await supabase.from("time_entries").update(patch).eq("id", existing.id);
+      ({ error } = await supabase.from("time_entries").update(patch).eq("id", existing.id));
     }
   } else {
-    await supabase.from("time_entries").insert({
+    ({ error } = await supabase.from("time_entries").insert({
       staff_id: access.staff.id,
       client_id: input.clientId,
       category_id: input.categoryId,
       entry_date: input.entryDate,
       hours: input.hours ?? 0,
       note: input.note ?? null,
-    });
+    }));
   }
+
+  if (error) return { error: error.message };
 
   revalidatePath("/timesheet");
   if (input.clientId) revalidatePath(`/clients/${input.clientId}`);
+  return {};
 }
 
-export async function deleteRow(clientId: string | null, categoryId: string | null, mondayISO: string) {
+export async function deleteRow(
+  clientId: string | null,
+  categoryId: string | null,
+  mondayISO: string,
+): Promise<{ error?: string }> {
   const access = await getStaffAccess();
   if (!access.staff) throw new Error("Not signed in");
   const supabase = await createClient();
@@ -65,7 +73,7 @@ export async function deleteRow(clientId: string | null, categoryId: string | nu
   const weekEnd = new Date(mondayISO);
   weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
 
-  await matchRow(
+  const { error } = await matchRow(
     supabase
       .from("time_entries")
       .delete()
@@ -76,6 +84,9 @@ export async function deleteRow(clientId: string | null, categoryId: string | nu
     categoryId,
   );
 
+  if (error) return { error: error.message as string };
+
   revalidatePath("/timesheet");
   if (clientId) revalidatePath(`/clients/${clientId}`);
+  return {};
 }

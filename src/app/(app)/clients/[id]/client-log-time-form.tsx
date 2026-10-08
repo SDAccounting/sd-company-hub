@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { logTime } from "../../timesheet/actions";
 import { todayISO } from "@/lib/timesheet";
 import type { TimesheetCategory } from "@/lib/types";
@@ -14,6 +14,7 @@ export function ClientLogTimeForm({
 }) {
   const [pending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
+  const [error, setError] = useState<string | null>(null);
 
   return (
     <form
@@ -26,12 +27,17 @@ export function ClientLogTimeForm({
         if (!hours || hours <= 0) return;
         const categoryId = String(data.get("categoryId") || "") || null;
         const note = String(data.get("note") || "").trim() || null;
+        setError(null);
         startTransition(async () => {
-          await logTime({ clientId, categoryId, entryDate: todayISO(), hours, note });
-          form.reset();
+          const result = await logTime({ clientId, categoryId, entryDate: todayISO(), hours, note });
+          if (result.error) {
+            setError(result.error);
+          } else {
+            form.reset();
+          }
         });
       }}
-      className="flex flex-col gap-2 sm:flex-row"
+      className="flex flex-col gap-2 sm:flex-row sm:flex-wrap"
     >
       <select
         name="categoryId"
@@ -66,6 +72,7 @@ export function ClientLogTimeForm({
       >
         {pending ? "Logging…" : "Log time"}
       </button>
+      {error && <p className="w-full text-sm text-red-600">{error}</p>}
     </form>
   );
 }

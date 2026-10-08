@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getStaffAccess } from "@/lib/access";
 import type { TimesheetCategory } from "@/lib/types";
 import { ClientLogTimeForm } from "./client-log-time-form";
 
@@ -12,6 +13,8 @@ interface EntryRow {
 }
 
 export async function ClientTimesheet({ clientId, clientName }: { clientId: string; clientName: string }) {
+  const access = await getStaffAccess();
+  const seesAll = access.staff?.role === "admin" || access.staff?.role === "manager";
   const supabase = await createClient();
 
   const { data: categories } = await supabase
@@ -40,7 +43,10 @@ export async function ClientTimesheet({ clientId, clientName }: { clientId: stri
     <div className="space-y-4">
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
         Logging time here adds it to <span className="font-medium text-slate-700">your own</span> weekly
-        timesheet too — this is just the {clientName}-only view of it.
+        timesheet too — this is just the {clientName}-only view of it.{" "}
+        {seesAll
+          ? "As an admin/manager you see everyone's time on this client."
+          : "You only see your own time here."}
       </div>
 
       <ClientLogTimeForm clientId={clientId} categories={categories ?? []} />

@@ -33,6 +33,10 @@ function rowKey(clientId: string | null, categoryId: string | null) {
   return `${clientId ?? "none"}|${categoryId ?? "none"}`;
 }
 
+function sortRows(rows: GridRow[]) {
+  return [...rows].sort((a, b) => a.clientName.localeCompare(b.clientName));
+}
+
 function buildRows(
   entries: EntryFromServer[],
   days: WeekDay[],
@@ -61,7 +65,7 @@ function buildRows(
       row.notes[dayIndex] = e.note;
     }
   }
-  return [...byKey.values()].sort((a, b) => a.clientName.localeCompare(b.clientName));
+  return sortRows([...byKey.values()]);
 }
 
 export function TimesheetGrid({
@@ -75,6 +79,7 @@ export function TimesheetGrid({
   entries,
   todayIso,
   canSeeReport,
+  locks,
 }: {
   monday: string;
   prevWeekHref: string;
@@ -86,6 +91,7 @@ export function TimesheetGrid({
   entries: EntryFromServer[];
   todayIso: string;
   canSeeReport: boolean;
+  locks: { start: string; end: string }[];
 }) {
   const [, startTransition] = useTransition();
   const clientNames = useMemo(() => new Map(clients.map((c) => [c.id, c.name])), [clients]);
@@ -96,43 +102,64 @@ export function TimesheetGrid({
   const [quickClientId, setQuickClientId] = useState("");
   const [quickCategoryId, setQuickCategoryId] = useState("");
   const [quickNote, setQuickNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
-  const defaultDayIndex = Math.max(
-    0,
-    days.findIndex((d) => d.date === todayIso),
-  );
+  const lockedDays = days.map((d) => locks.some((l) => d.date >= l.start && d.date <= l.end));
+  const anyLocked = lockedDays.some(Boolean);
+
+  const todayIndex = days.findIndex((d) => d.date === todayIso);
+  const preferredIndex = todayIndex >= 0 ? todayIndex : 0;
+  const defaultDayIndex = !lockedDays[preferredIndex] ? preferredIndex : lockedDays.findIndex((l) => !l);
+
+  function persist(action: () => Promise<{ error?: string }>, revert: () => void) {
+    setError(null);
+    startTransition(async () => {
+      const result = await action();
+      if (result.error) {
+        setError(result.error);
+        revert();
+      }
+    });
+  }
 
   function addRow() {
-    if (!quickClientId && quickClientId !== "internal") return;
+    if (defaultDayIndex < 0 || !quickClientId) return;
     const clientId = quickClientId === "internal" ? null : quickClientId;
     const categoryId = quickCategoryId || null;
     const key = rowKey(clientId, categoryId);
+    const alreadyThere = rows.some((r) => r.key === key);
+    const note = quickNote.trim();
 
-    setRows((prev) => {
-      if (prev.some((r) => r.key === key)) return prev;
-      return [
-        ...prev,
-        {
-          key,
+    if (!alreadyThere) {
+      setRows((prev) =>
+        sortRows([
+          ...prev,
+          {
+            key,
+            clientId,
+            categoryId,
+            clientName: clientId ? clientNames.get(clientId) ?? "Unknown client" : "Internal / Admin",
+            categoryName: categoryId ? categoryNames.get(categoryId) ?? "—" : "—",
+            hours: days.map(() => null),
+            notes: days.map((_, i) => (i === defaultDayIndex && note ? note : null)),
+          },
+        ]),
+      );
+    }
+
+    persist(
+      () =>
+        logTime({
           clientId,
           categoryId,
-          clientName: clientId ? clientNames.get(clientId) ?? "Unknown client" : "Internal / Admin",
-          categoryName: categoryId ? categoryNames.get(categoryId) ?? "—" : "—",
-          hours: days.map(() => null),
-          notes: days.map((_, i) => (i === defaultDayIndex && quickNote.trim() ? quickNote.trim() : null)),
-        },
-      ];
-    });
-
-    startTransition(async () => {
-      await logTime({
-        clientId,
-        categoryId,
-        entryDate: days[defaultDayIndex].date,
-        hours: 0,
-        note: quickNote.trim() || null,
-      });
-    });
+          entryDate: days[defaultDayIndex].date,
+          hours: 0,
+          note: note || null,
+        }),
+      () => {
+        if (!alreadyThere) setRows((prev) => prev.filter((r) => r.key !== key));
+      },
+    );
 
     setQuickClientId("");
     setQuickCategoryId("");
@@ -140,7 +167,11 @@ export function TimesheetGrid({
   }
 
   function editHours(row: GridRow, dayIndex: number, value: string) {
-    const hours = value === "" ? 0 : Number(value);
+    const parsed = value === "" ? 0 : Number(value);
+    const hours = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+    const previous = row.hours[dayIndex];
+    if ((previous ?? 0) === hours) return;
+
     setRows((prev) =>
       prev.map((r) =>
         r.key === row.key
@@ -148,30 +179,44 @@ export function TimesheetGrid({
           : r,
       ),
     );
-    startTransition(async () => {
-      await logTime({
-        clientId: row.clientId,
-        categoryId: row.categoryId,
-        entryDate: days[dayIndex].date,
-        hours: Number.isFinite(hours) ? hours : 0,
-      });
-    });
+    persist(
+      () =>
+        logTime({
+          clientId: row.clientId,
+          categoryId: row.categoryId,
+          entryDate: days[dayIndex].date,
+          hours,
+        }),
+      () =>
+        setRows((prev) =>
+          prev.map((r) =>
+            r.key === row.key ? { ...r, hours: r.hours.map((h, i) => (i === dayIndex ? previous : h)) } : r,
+          ),
+        ),
+    );
   }
 
   function editNote(row: GridRow, dayIndex: number, value: string) {
+    const previous = row.notes[dayIndex];
+    const next = value.trim() || null;
+    if ((previous ?? null) === next) return;
+
     setRows((prev) =>
-      prev.map((r) =>
-        r.key === row.key ? { ...r, notes: r.notes.map((n, i) => (i === dayIndex ? value || null : n)) } : r,
-      ),
+      prev.map((r) => (r.key === row.key ? { ...r, notes: r.notes.map((n, i) => (i === dayIndex ? next : n)) } : r)),
     );
-    startTransition(async () => {
-      await logTime({
-        clientId: row.clientId,
-        categoryId: row.categoryId,
-        entryDate: days[dayIndex].date,
-        note: value || null,
-      });
-    });
+    persist(
+      () =>
+        logTime({
+          clientId: row.clientId,
+          categoryId: row.categoryId,
+          entryDate: days[dayIndex].date,
+          note: next,
+        }),
+      () =>
+        setRows((prev) =>
+          prev.map((r) => (r.key === row.key ? { ...r, notes: r.notes.map((n, i) => (i === dayIndex ? previous : n)) } : r)),
+        ),
+    );
   }
 
   function removeRow(row: GridRow) {
@@ -179,9 +224,10 @@ export function TimesheetGrid({
       return;
     }
     setRows((prev) => prev.filter((r) => r.key !== row.key));
-    startTransition(async () => {
-      await deleteRow(row.clientId, row.categoryId, monday);
-    });
+    persist(
+      () => deleteRow(row.clientId, row.categoryId, monday),
+      () => setRows((prev) => sortRows([...prev, row])),
+    );
   }
 
   function rowTotal(row: GridRow) {
@@ -199,7 +245,7 @@ export function TimesheetGrid({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-slate-900">My Timesheet</h1>
-          <p className="mt-1 text-sm text-slate-500">Real data — entries save as you type.</p>
+          <p className="mt-1 text-sm text-slate-500">Only you (and admins) can see your hours. Entries save as you type.</p>
         </div>
         <div className="flex items-center gap-3">
           {canSeeReport && (
@@ -222,6 +268,19 @@ export function TimesheetGrid({
           </Link>
         </div>
       </div>
+
+      {anyLocked && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+          🔒 {lockedDays.every(Boolean) ? "This whole week is" : "Days marked 🔒 are"} in a closed pay period and can no
+          longer be changed. Ask an admin if something needs correcting.
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">
+          Couldn&apos;t save that change: {error}
+        </div>
+      )}
 
       <div className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Add a client to this week</h2>
@@ -262,7 +321,8 @@ export function TimesheetGrid({
           />
           <button
             onClick={addRow}
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            disabled={defaultDayIndex < 0}
+            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-40"
           >
             Add
           </button>
@@ -275,10 +335,13 @@ export function TimesheetGrid({
             <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
               <th className="px-4 py-3 font-medium">Client</th>
               <th className="px-2 py-3 font-medium">Category</th>
-              {days.map((d) => (
+              {days.map((d, i) => (
                 <th key={d.label} className="px-2 py-3 text-center font-medium">
                   {d.label}
-                  <div className="font-normal normal-case text-slate-300">{d.dayOfMonth}</div>
+                  <div className="font-normal normal-case text-slate-300">
+                    {d.dayOfMonth}
+                    {lockedDays[i] && " 🔒"}
+                  </div>
                 </th>
               ))}
               <th className="px-3 py-3 text-right font-medium">Total</th>
@@ -294,15 +357,16 @@ export function TimesheetGrid({
                     <td className="px-4 py-2 font-medium text-slate-900">{row.clientName}</td>
                     <td className="px-2 py-2 text-xs text-slate-600">{row.categoryName}</td>
                     {row.hours.map((h, i) => (
-                      <td key={i} className="px-1 py-2">
+                      <td key={`${i}-${h ?? ""}`} className="px-1 py-2">
                         <input
                           type="number"
                           step="0.25"
                           min="0"
                           defaultValue={h ?? ""}
+                          disabled={lockedDays[i]}
                           onBlur={(e) => editHours(row, i, e.target.value)}
                           placeholder="—"
-                          className="w-14 rounded-md border border-slate-200 px-1.5 py-1 text-center text-sm"
+                          className="w-14 rounded-md border border-slate-200 px-1.5 py-1 text-center text-sm disabled:bg-slate-100 disabled:text-slate-400"
                         />
                       </td>
                     ))}
@@ -321,8 +385,9 @@ export function TimesheetGrid({
                       </button>
                       <button
                         onClick={() => removeRow(row)}
-                        title="Remove this row"
-                        className="ml-1 text-xs text-slate-300 hover:text-red-500"
+                        disabled={anyLocked}
+                        title={anyLocked ? "Can't remove — part of this week is locked" : "Remove this row"}
+                        className="ml-1 text-xs text-slate-300 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-slate-300"
                       >
                         ✕
                       </button>
@@ -348,13 +413,16 @@ export function TimesheetGrid({
                         ) : (
                           <p className="text-sm text-slate-400">No notes yet for {row.clientName} this week.</p>
                         )}
-                        <textarea
-                          defaultValue={row.notes[defaultDayIndex] ?? ""}
-                          onBlur={(e) => editNote(row, defaultDayIndex, e.target.value)}
-                          placeholder={`Add a note for ${row.clientName} today…`}
-                          rows={2}
-                          className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                        />
+                        {defaultDayIndex >= 0 && (
+                          <textarea
+                            key={`${row.key}-${row.notes[defaultDayIndex] ?? ""}`}
+                            defaultValue={row.notes[defaultDayIndex] ?? ""}
+                            onBlur={(e) => editNote(row, defaultDayIndex, e.target.value)}
+                            placeholder={`Add a note for ${row.clientName} on ${days[defaultDayIndex].label} ${days[defaultDayIndex].dayOfMonth}…`}
+                            rows={2}
+                            className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                          />
+                        )}
                       </td>
                     </tr>
                   )}
